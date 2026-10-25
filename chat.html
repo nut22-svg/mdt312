@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Chat - Campus Marketplace</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .tab-btn {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background: #e0e0e0;
+            color: #333;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab-btn.active {
+            background: #27ae60;
+            color: white;
+            border-color: #27ae60;
+            font-weight: bold;
+        }
+        .chat-box {
+            border: 1px solid #ddd;
+            border-radius: 0 0 8px 8px;
+            height: 320px;
+            overflow-y: auto;
+            padding: 15px;
+            background: #fafafa;
+            margin-bottom: 15px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 75%;
+            word-wrap: break-word;
+        }
+        .message.my-msg {
+            background-color: #27ae60;
+            color: white;
+            margin-left: auto;
+        }
+        .message.other-msg {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        .quick-room-btn {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+            padding: 4px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .quick-room-btn:hover { background: #c8e6c9; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ROOMART 🛒</h1>
+        <nav>
+            <a href="index.html">หน้าแรก</a>
+            <a href="checkout.html">ตะกร้าสินค้า</a>
+            <a href="profile.html">ประวัติการซื้อ-ขาย</a>
+            <a href="chat.html"><strong>Live Chat</strong></a>
+        </nav>
+    </header>
+
+    <div class="container" style="max-width: 650px; margin-top: 30px;">
+        <fieldset>
+            <legend><h2>💬 ระบบพูดคุย Live Chat</h2></legend>
+
+            <p id="connectionStatus" style="font-weight: bold; color: #e67e22; margin-bottom: 10px;">
+                🟡 กำลังเชื่อมต่อระบบแชท...
+            </p>
+
+            <div style="margin-bottom: 15px;">
+                <button id="tabGlobalBtn" class="tab-btn active" onclick="switchTab('global')">🌐 แชทรวม (ทุกคน)</button>
+                <button id="tabRoomBtn" class="tab-btn" onclick="switchTab('room')">🔒 แชทห้องเฉพาะ / ซื้อขาย</button>
+            </div>
+
+            <div id="roomJoinSection" style="display: none; margin-bottom: 15px; background: #eef9f1; padding: 12px; border-radius: 6px; border: 1px solid #c8e6c9;">
+                <label for="roomIdInput"><strong>กรอกรหัสห้อง (Room ID) เพื่อเข้าคุยส่วนตัว:</strong></label>
+                <div style="display: flex; gap: 10px; margin-top: 6px;">
+                    <input type="text" id="roomIdInput" value="room1" placeholder="เช่น room1 หรือ ID สินค้า" style="flex: 1; padding: 8px;">
+                    <button onclick="joinCustomRoom()" style="padding: 8px 15px; background-color: #27ae60;">เข้าร่วมห้อง</button>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.8rem; color: #555;">
+                    เลือกห้องด่วน: 
+                    <button class="quick-room-btn" onclick="quickJoin('room1')">#room1</button>
+                    <button class="quick-room-btn" onclick="quickJoin('room2')">#room2</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <p style="margin: 0;">ห้องปัจจุบัน: <strong id="currentRoomText" style="color: #27ae60;">🌐 แชทรวม (ทุกคน)</strong></p>
+                <button onclick="loadHistory(activeRoom)" style="font-size: 0.75rem; padding: 3px 8px; background: #95a5a6;">🔄 รีเฟรชข้อความ</button>
+            </div>
+
+            <div id="chatBox" class="chat-box"></div>
+
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="messageInput" placeholder="พิมพ์ข้อความที่นี่..." style="flex: 1; padding: 10px;">
+                <button onclick="sendMessage()" style="padding: 10px 20px;">ส่งข้อความ</button>
+            </div>
+        </fieldset>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const user = JSON.parse(localStorage.getItem('user')) || { name: 'นักศึกษา' };
+        let activeRoom = 'global';
+
+        socket.on('connect', () => {
+            document.getElementById('connectionStatus').innerText = '🟢 เชื่อมต่อระบบแชทสำเร็จ!';
+            document.getElementById('connectionStatus').style.color = '#27ae60';
+            socket.emit('join_room', 'global');
+            loadHistory('global');
+        });
+
+        socket.on('connect_error', () => {
+            document.getElementById('connectionStatus').innerText = '🔴 ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+            document.getElementById('connectionStatus').style.color = '#e74c3c';
+        });
+
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        async function loadHistory(roomId) {
+            if (!roomId) return;
+            const chatBox = document.getElementById('chatBox');
+
+            try {
+                const res = await fetch(`/api/messages/${roomId}`);
+                const messages = await res.json();
+                chatBox.innerHTML = '';
+
+                if (messages.length === 0) {
+                    chatBox.innerHTML = `<p style="color: #888; font-size: 0.85rem; text-align: center; margin-top: 20px;">ยังไม่มีข้อความในห้อง "${roomId}" เริ่มพิมพ์คุยกันได้เลย!</p>`;
+                    return;
+                }
+
+                messages.forEach(msg => appendMessageUI(msg));
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function switchTab(mode) {
+            if (mode === 'global') {
+                if (activeRoom && activeRoom !== 'global') socket.emit('leave_room', activeRoom);
+                activeRoom = 'global';
+                socket.emit('join_room', 'global');
+                
+                document.getElementById('tabGlobalBtn').className = 'tab-btn active';
+                document.getElementById('tabRoomBtn').className = 'tab-btn';
+                document.getElementById('roomJoinSection').style.display = 'none';
+                document.getElementById('currentRoomText').innerText = '🌐 แชทรวม (ทุกคนในระบบ)';
+                
+                loadHistory('global');
+            } else {
+                activeRoom = '';
+                document.getElementById('tabGlobalBtn').className = 'tab-btn';
+                document.getElementById('tabRoomBtn').className = 'tab-btn active';
+                document.getElementById('roomJoinSection').style.display = 'block';
+                document.getElementById('currentRoomText').innerText = 'กรุณากรอก รหัสห้อง แล้วกดเข้าร่วม';
+                
+                document.getElementById('chatBox').innerHTML = `
+                    <div style="text-align: center; color: #777; margin-top: 50px;">
+                        <p style="font-size: 1.1rem; font-weight: bold;">🔒 โหมดแชทห้องเฉพาะ / ซื้อขาย</p>
+                        <p style="font-size: 0.85rem; margin-top: 5px;">กรอกรหัสห้องด้านบน (เช่น room1) แล้วกด <strong>"เข้าร่วมห้อง"</strong></p>
+                    </div>
+                `;
+            }
+        }
+
+        function joinCustomRoom() {
+            const roomId = document.getElementById('roomIdInput').value.trim();
+            if (!roomId) return alert('กรุณากรอกรหัสห้องก่อนครับ');
+
+            if (activeRoom && activeRoom !== 'global') socket.emit('leave_room', activeRoom);
+            
+            activeRoom = roomId;
+            socket.emit('join_room', activeRoom);
+
+            document.getElementById('currentRoomText').innerText = `🔒 ห้องส่วนตัว: "${activeRoom}"`;
+            loadHistory(activeRoom);
+        }
+
+        function quickJoin(roomName) {
+            document.getElementById('roomIdInput').value = roomName;
+            joinCustomRoom();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            if (!activeRoom) {
+                return alert('กรุณากรอกรหัสห้องแล้วกด "เข้าร่วมห้อง" ก่อนส่งข้อความครับ');
+            }
+
+            const msgData = {
+                room: activeRoom,
+                sender: user.name || 'นักศึกษา',
+                text: text,
+                time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            socket.emit('send_message', msgData);
+            input.value = '';
+        }
+
+        function appendMessageUI(data) {
+            const chatBox = document.getElementById('chatBox');
+            
+            if (chatBox.querySelector('div[style*="text-align: center"]') || chatBox.querySelector('p[style*="text-align: center"]')) {
+                chatBox.innerHTML = '';
+            }
+
+            const isMyMsg = data.sender === user.name;
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isMyMsg ? 'my-msg' : 'other-msg'}`;
+            msgDiv.innerHTML = `
+                <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">${data.sender} (${data.time})</div>
+                <div>${data.text}</div>
+            `;
+
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        socket.on('receive_message', (data) => {
+            if (data.room === activeRoom) {
+                appendMessageUI(data);
+            }
+        });
+
+        // โหลดข้อมูลเมื่อเปิดหน้าเว็บทันที
+        loadHistory('global');
+    </script>
+</body>
+</html>

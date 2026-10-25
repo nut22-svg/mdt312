@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>สมัครสมาชิก - Campus Marketplace</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>ROOMART 🛒</h1>
+        <a href="login.html">เข้าสู่ระบบ</a>
+    </header>
+
+    <div class="container">
+        <fieldset style="max-width: 400px; margin: 40px auto;">
+            <legend><h2>สมัครสมาชิก</h2></legend>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="name">ชื่อ-นามสกุล / ชื่อเล่น:</label>
+                    <input type="text" id="name" placeholder="เช่น สมชาย ใจดี" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">อีเมลนักศึกษา:</label>
+                    <input type="email" id="email" placeholder="student@university.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">รหัสผ่าน:</label>
+                    <input type="password" id="password" placeholder="กำหนดรหัสผ่าน" required>
+                </div>
+                <button type="submit" style="width: 100%; margin-top: 10px;">สมัครสมาชิก</button>
+            </form>
+            <p style="margin-top: 15px; text-align: center;">
+                มีบัญชีอยู่แล้ว? <a href="login.html" style="color: #2c3e50;">เข้าสู่ระบบที่นี่</a>
+            </p>
+        </fieldset>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await res.json();
+                alert(data.message);
+
+                if (data.success) {
+                    window.location.href = 'login.html';
+                }
+            } catch (err) {
+                alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+            }
+        });
+    </script>
+</body>
+</html>

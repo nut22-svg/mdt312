@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ชำระเงิน & ใบเสร็จรับเงิน - Campus Marketplace</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* สไตล์ใบเสร็จรับเงินสำหรับแสดงผลและสั่งพิมพ์ */
+        .receipt-card {
+            background: #fff;
+            border: 2px dashed #27ae60;
+            padding: 25px;
+            border-radius: 10px;
+            max-width: 550px;
+            margin: 20px auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .receipt-header {
+            text-align: center;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .receipt-table th, .receipt-table td {
+            border-bottom: 1px solid #eee;
+            padding: 8px;
+            text-align: left;
+        }
+        .receipt-table th { background-color: #f9f9f9; }
+        .receipt-total {
+            text-align: right;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #27ae60;
+            margin-top: 15px;
+            border-top: 2px solid #27ae60;
+            padding-top: 10px;
+        }
+        /* รูปแบบเมื่อกดพิมพ์ใบเสร็จ (Hide Navbar และปุ่มต่างๆ ออก) */
+        @media print {
+            header, nav, button, .no-print { display: none !important; }
+            body { background: white; }
+            .receipt-card { border: 1px solid #000; box-shadow: none; width: 100%; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header class="no-print">
+        <h1>ROOMART 🛒</h1>
+        <nav>
+            <a href="index.html">หน้าแรก</a>
+            <a href="checkout.html"><strong>ตะกร้าสินค้า</strong></a>
+            <a href="profile.html">ประวัติการซื้อ-ขาย</a>
+            <a href="chat.html">Live Chat</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- ส่วนตารางตะกร้าสินค้าปกติ -->
+        <div id="cartSection">
+            <h2>🛒 รายการสินค้าในตะกร้า</h2>
+            <div id="cartItemsList" style="margin-top: 15px;">กำลังโหลดตะกร้า...</div>
+            <h3 style="margin-top: 15px;">ราคารวมทั้งสิ้น: <span id="cartTotalPrice" style="color: #e74c3c;">0</span> บาท</h3>
+            
+            <button onclick="processCheckout()" style="background-color: #27ae60; padding: 12px 25px; font-size: 1rem; margin-top: 15px;">
+                💳 ยืนยันการชำระเงิน & ออกใบเสร็จ
+            </button>
+        </div>
+
+        <!-- ส่วนใบเสร็จรับเงิน (แสดงเมื่อชำระเงินสำเร็จ) -->
+        <div id="receiptSection" style="display: none;">
+            <div class="receipt-card">
+                <div class="receipt-header">
+                    <h2 style="color: #27ae60; margin-bottom: 5px;">📜 ใบเสร็จรับเงิน / RECEIPT</h2>
+                    <p style="font-size: 0.85rem; color: #666;">Campus Marketplace System</p>
+                    <p style="font-size: 0.85rem; margin-top: 5px;"><strong>เลขที่ใบเสร็จ:</strong> <span id="rOrderId">-</span></p>
+                    <p style="font-size: 0.85rem;"><strong>วันที่ทำการซื้อขาย:</strong> <span id="rDate">-</span></p>
+                </div>
+
+                <div style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 10px;">
+                    <p><strong>👤 ผู้สั่งซื้อ (Buyer):</strong> <span id="rBuyerName">-</span></p>
+                </div>
+
+                <table class="receipt-table">
+                    <thead>
+                        <tr>
+                            <th>รายการสินค้า</th>
+                            <th>ผู้ขาย (Seller)</th>
+                            <th style="text-align: right;">ราคา</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rItemsList"></tbody>
+                </table>
+
+                <div class="receipt-total">
+                    ยอดชำระทั้งสิ้น: <span id="rTotalPrice">0</span> บาท
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;" class="no-print">
+                    <button onclick="window.print()" style="background-color: #2980b9; margin-right: 10px;">
+                        🖨️ พิมพ์ใบเสร็จ / บันทึก PDF
+                    </button>
+                    <button onclick="window.location.href='index.html'" style="background-color: #7f8c8d;">
+                        กลับหน้าหลัก
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const user = JSON.parse(localStorage.getItem('user')) || { user_id: 'guest', name: 'นักศึกษา (ผู้ซื้อ)' };
+
+        function loadCart() {
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const container = document.getElementById('cartItemsList');
+
+            if (cart.length === 0) {
+                container.innerHTML = '<p style="color: #666;">ยังไม่มีสินค้าในตะกร้า</p>';
+                document.getElementById('cartTotalPrice').innerText = '0';
+                return;
+            }
+
+            let total = 0;
+            container.innerHTML = cart.map((item, index) => {
+                total += Number(item.price);
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px;">
+                        <div>
+                            <strong>${item.title}</strong>
+                            <div style="font-size: 0.8rem; color: #666;">ผู้ขาย: ${item.seller_name || 'นักศึกษา'}</div>
+                        </div>
+                        <div>
+                            <span style="color: #e74c3c; font-weight: bold; margin-right: 15px;">${item.price} บาท</span>
+                            <button onclick="removeFromCart(${index})" style="background-color: #e74c3c; padding: 4px 8px; font-size: 0.8rem;">ลบ</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('cartTotalPrice').innerText = total;
+        }
+
+        function removeFromCart(index) {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            cart.splice(index, 1);
+            localStorage.setItem('cart', JSON.stringify(cart));
+            loadCart();
+        }
+
+        // ประมวลผลสั่งซื้อและแสดงใบเสร็จ
+        async function processCheckout() {
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            if (cart.length === 0) return alert('ไม่มีสินค้าในตะกร้า');
+
+            try {
+                const res = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        buyer_id: user.user_id || 'guest',
+                        buyer_name: user.name || 'นักศึกษา (ผู้ซื้อ)',
+                        cartItems: cart
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    // เคลียร์ตะกร้า
+                    localStorage.removeItem('cart');
+                    
+                    // แสดงผลใบเสร็จรับเงิน
+                    showReceipt(data.order);
+                } else {
+                    alert('เกิดข้อผิดพลาดในการสั่งซื้อ');
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+            }
+        }
+
+        function showReceipt(order) {
+            document.getElementById('cartSection').style.display = 'none';
+            document.getElementById('receiptSection').style.display = 'block';
+
+            document.getElementById('rOrderId').innerText = order.order_id;
+            document.getElementById('rDate').innerText = new Date(order.createdAt).toLocaleString('th-TH');
+            document.getElementById('rBuyerName').innerText = order.buyer_name || user.name || 'นักศึกษา (ผู้ซื้อ)';
+            document.getElementById('rTotalPrice').innerText = order.totalPrice;
+
+            const itemsTbody = document.getElementById('rItemsList');
+            itemsTbody.innerHTML = (order.items || []).map(item => `
+                <tr>
+                    <td>${item.title}</td>
+                    <td>${item.seller_name || 'นักศึกษา (ผู้ขาย)'}</td>
+                    <td style="text-align: right;">${item.price} บาท</td>
+                </tr>
+            `).join('');
+        }
+
+        loadCart();
+    </script>
+</body>
+</html>

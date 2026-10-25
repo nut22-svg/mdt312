@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Campus Marketplace - หน้าแรก</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>ROOMART 🛒</h1>
+        <nav>
+            <a href="index.html"><strong>หน้าแรก</strong></a>
+            <a href="checkout.html">ตะกร้าสินค้า (<span id="cartCount">0</span>)</a>
+            <a href="profile.html">ประวัติการซื้อ-ขาย</a>
+            <a href="chat.html">Live Chat</a>
+            <span id="userInfo">
+                <a href="login.html" id="loginLink">เข้าสู่ระบบ</a>
+            </span>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- ฟอร์มลงขายสินค้า -->
+        <fieldset>
+            <legend><h2>ลงประกาศขายสินค้ามือสอง</h2></legend>
+            <form id="productForm">
+                <div class="form-group">
+                    <label>ชื่อสินค้า:</label>
+                    <input type="text" id="title" required placeholder="เช่น สมุดโน้ต, เสื้อช็อป">
+                </div>
+                <div class="form-group">
+                    <label>ราคา (บาท):</label>
+                    <input type="number" id="price" required placeholder="เช่น 150">
+                </div>
+                <div class="form-group">
+                    <label>หมวดหมู่:</label>
+                    <select id="category">
+                        <option value="หนังสือเรียน">หนังสือเรียน</option>
+                        <option value="ของใช้หอพัก">ของใช้หอพัก</option>
+                        <option value="อุปกรณ์ไอที">อุปกรณ์ไอที</option>
+                        <option value="อื่นๆ">อื่นๆ</option>
+                    </select>
+                </div>
+                <button type="submit">ลงขายสินค้า</button>
+            </form>
+        </fieldset>
+
+        <!-- แสดงรายการสินค้า -->
+        <h2 style="margin: 20px 0 10px 0;">รายการสินค้าที่มีวางขายอยู่</h2>
+        <div id="productGrid" class="product-grid">
+            <p>กำลังโหลดรายการสินค้า...</p>
+        </div>
+    </div>
+
+    <script>
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            document.getElementById('cartCount').innerText = cart.length;
+        }
+
+        function checkUserLogin() {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const userInfo = document.getElementById('userInfo');
+            if (user && user.name) {
+                userInfo.innerHTML = `สวัสดี, <a href="profile.html" style="color: #2ecc71; text-decoration: underline;"><strong>${user.name}</strong></a> | <a href="#" onclick="logout()">ออกจากระบบ</a>`;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.reload();
+        }
+
+        async function loadProducts() {
+    try {
+        const res = await fetch('/api/products');
+        const products = await res.json();
+        const grid = document.getElementById('productGrid');
+
+        if (products.length === 0) {
+            grid.innerHTML = '<p>ยังไม่มีสินค้าวางขายในขณะนี้</p>';
+            return;
+        }
+
+        grid.innerHTML = products.map(p => {
+            // แปลง Object เป็น String ป้องกันข้อผิดพลาดเกี่ยวกับเครื่องหมายคำพูด
+            const sellerNameEscaped = (p.seller_name || 'นักศึกษา').replace(/'/g, "\\'");
+            const titleEscaped = (p.title || '').replace(/'/g, "\\'");
+            return `
+            <div class="card">
+                <h3>${p.title}</h3>
+                <div class="price">${p.price} บาท</div>
+                <p style="font-size: 0.85rem; color: #666;">หมวดหมู่: ${p.category || 'ทั่วไป'}</p>
+                <p style="font-size: 0.85rem; color: #666;">ผู้ขาย: ${p.seller_name || 'นักศึกษา'}</p>
+                
+                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px;">
+                    <button onclick="addToCartOnly('${p.product_id}', '${titleEscaped}', ${p.price}, '${p.seller_id || ''}', '${sellerNameEscaped}')" style="background-color: #f39c12; flex: 1;">
+                        🛒 เพิ่มลงตะกร้า
+                    </button>
+                    <button onclick="buyNow('${p.product_id}', '${titleEscaped}', ${p.price}, '${p.seller_id || ''}', '${sellerNameEscaped}')" style="background-color: #27ae60; flex: 1;">
+                        ⚡ ซื้อทันที
+                    </button>
+                </div>
+            </div>
+        `}).join('');
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function addToCartOnly(productId, title, price, sellerId, sellerName) {
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    const exists = cart.find(item => (item.product_id || item.id) === productId);
+    
+    if (!exists) {
+        cart.push({ 
+            product_id: productId, 
+            id: productId, 
+            title: title, 
+            price: price,
+            seller_id: sellerId,
+            seller_name: sellerName
+        });
+        localStorage.setItem('cart', JSON.stringify(cart));
+        updateCartCount();
+        alert('เพิ่มสินค้าลงในตะกร้าเรียบร้อยแล้ว!');
+    } else {
+        alert('สินค้านี้อยู่ในตะกร้าเรียบร้อยแล้ว');
+    }
+}
+
+function buyNow(productId, title, price, sellerId, sellerName) {
+    addToCartOnly(productId, title, price, sellerId, sellerName);
+    window.location.href = 'checkout.html';
+}
+
+        document.getElementById('productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = JSON.parse(localStorage.getItem('user')) || {};
+            const title = document.getElementById('title').value;
+            const price = document.getElementById('price').value;
+            const category = document.getElementById('category').value;
+
+            try {
+                const res = await fetch('/api/products', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seller_id: user.user_id || 'guest',
+                        seller_name: user.name || 'นักศึกษา',
+                        title,
+                        price,
+                        category
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    alert('ลงขายสินค้าสำเร็จ!');
+                    document.getElementById('productForm').reset();
+                    loadProducts();
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการลงขายสินค้า');
+            }
+        });
+
+        checkUserLogin();
+        updateCartCount();
+        loadProducts();
+    </script>
+</body>
+</html>

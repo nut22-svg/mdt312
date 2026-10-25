@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>เข้าสู่ระบบ - ROOMART 🛒</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container" style="max-width: 400px; margin-top: 80px;">
+        <fieldset>
+            <legend>เข้าสู่ระบบ</legend>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>อีเมลนักศึกษา:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label>รหัสผ่าน:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" style="width: 100%;">เข้าสู่ระบบ</button>
+            </form>
+
+            <!-- เพิ่มส่วนนี้สำหรับลิงก์ไปหน้าสมัครสมาชิก -->
+            <p style="margin-top: 15px; text-align: center;">
+                ยังไม่มีบัญชี? <a href="register.html" style="color: #2c3e50;">สมัครสมาชิกที่นี่</a>
+            </p>
+        </fieldset>
+    </div>
+
+    <script>
+        window.onload = function() {
+            document.getElementById('login-form').onsubmit = async function(e) {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('user', JSON.stringify(data.user)); // บันทึกสถานะผู้ใช้
+                    alert('เข้าสู่ระบบสำเร็จ!');
+                    window.location.href = 'index.html';
+                } else {
+                    alert(data.message);
+                }
+            };
+        };
+    </script>
+</body>
+</html>
